@@ -32,10 +32,26 @@ def generate_root(merkle_leaf, path):
     root_hash = merkle_leaf
     for index in range(len(path_list)):
         other_leaf_info = path_list[index].split(':')
-        if other_leaf_info[0] == "l":
-            root_hash = sha256((other_leaf_info[1] + root_hash).encode()).hexdigest().lower()
-        else:
-            root_hash = sha256((root_hash + other_leaf_info[1]).encode()).hexdigest().lower()
+        if len(other_leaf_info) != 2:
+            raise ValueError(f"Invalid path format at index {index}: '{path_list[index]}'. Expected format 'direction:hash'")
+        
+        direction = other_leaf_info[0]
+        hash_value = other_leaf_info[1]
+        
+        # Validate direction
+        if direction not in ["l", "r"]:
+            raise ValueError(f"Invalid direction '{direction}' at index {index}. Must be 'l' (left) or 'r' (right)")
+        
+        # Validate hash format
+        try:
+            int(hash_value, 16)
+        except ValueError:
+            raise ValueError(f"Invalid hash format '{hash_value}' at index {index}. Must be a valid hexadecimal string")
+        
+        if direction == "l":
+            root_hash = sha256((hash_value + root_hash).encode()).hexdigest().lower()
+        else:  # direction == "r"
+            root_hash = sha256((root_hash + hash_value).encode()).hexdigest().lower()
     return root_hash
 
 
@@ -44,14 +60,36 @@ def main():
     # format: hash {rawInputString}
     if args.command == "hash":
         raw_input_string = args.raw_input_string
+        if not raw_input_string or raw_input_string.strip() == "":
+            print("Error: Input string cannot be empty")
+            return
         hash_result = hash(raw_input_string)
         print("hash: ", hash_result)
     # calc the root hash for the provided merkle leaf and merkle path
     elif args.command == "verify":
         path = args.merkle_path
         merkle_leaf = args.merkle_leaf
-        root_hash = generate_root(merkle_leaf, path)
-        print('root hash: ', root_hash)
+        
+        # Validate inputs
+        if not merkle_leaf or merkle_leaf.strip() == "":
+            print("Error: Merkle leaf cannot be empty")
+            return
+        if not path or path.strip() == "":
+            print("Error: Merkle path cannot be empty")
+            return
+        
+        # Validate merkle leaf format (should be a valid hex string)
+        try:
+            int(merkle_leaf, 16)
+        except ValueError:
+            print("Error: Merkle leaf must be a valid hexadecimal string")
+            return
+            
+        try:
+            root_hash = generate_root(merkle_leaf, path)
+            print('root hash: ', root_hash)
+        except ValueError as e:
+            print(f"Error: {e}")
     else:
         print('command error, please check your command')
 
